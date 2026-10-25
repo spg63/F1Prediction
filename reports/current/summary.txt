@@ -1,0 +1,37 @@
+F1 Drivers' Championship forecast
+Cutoff 2026-10-25T01:50:00Z; completed GPs 17; simulations 20000; seed 20261025
+Full-distance races; no weather/telemetry forecast. Probabilities are model estimates, not demonstrated calibration.
+
+Andrea Kimi Antonelli   top5 100.0%  title 100.0%  points 438.0 [400.0, 473.0]
+George Russell          top5  96.2%  title   0.0%  points 304.5 [272.0, 339.0]
+Max Verstappen          top5  94.8%  title   0.0%  points 304.6 [268.0, 341.0]
+Lewis Hamilton          top5  90.8%  title   0.0%  points 292.9 [261.0, 327.0]
+Charles Leclerc         top5  73.6%  title   0.0%  points 279.8 [247.0, 315.0]
+Lando Norris            top5  44.6%  title   0.0%  points 266.3 [233.0, 302.0]
+Oscar Piastri           top5   0.0%  title   0.0%  points 173.0 [149.0, 201.0]
+Isack Hadjar            top5   0.0%  title   0.0%  points 136.0 [111.0, 166.0]
+Liam Lawson             top5   0.0%  title   0.0%  points 86.4 [75.0, 105.0]
+Arvid Lindblad          top5   0.0%  title   0.0%  points 63.4 [43.0, 91.0]
+Pierre Gasly            top5   0.0%  title   0.0%  points 57.2 [42.0, 80.0]
+Franco Colapinto        top5   0.0%  title   0.0%  points 35.1 [27.0, 51.0]
+Oliver Bearman          top5   0.0%  title   0.0%  points 27.0 [23.0, 38.0]
+Nico Hülkenberg        top5   0.0%  title   0.0%  points 19.7 [13.0, 34.0]
+Gabriel Bortoleto       top5   0.0%  title   0.0%  points 14.7 [10.0, 26.0]
+Esteban Ocon            top5   0.0%  title   0.0%  points 11.4 [7.0, 23.0]
+Fernando Alonso         top5   0.0%  title   0.0%  points 9.8 [7.0, 19.0]
+Carlos Sainz            top5   0.0%  title   0.0%  points 9.3 [7.0, 17.0]
+Alexander Albon         top5   0.0%  title   0.0%  points 7.0 [5.0, 14.0]
+Lance Stroll            top5   0.0%  title   0.0%  points 1.4 [0.0, 8.0]
+Yuki Tsunoda            top5   0.0%  title   0.0%  points 1.0 [1.0, 1.0]
+Valtteri Bottas         top5   0.0%  title   0.0%  points 0.3 [0.0, 2.0]
+Sergio Pérez           top5   0.0%  title   0.0%  points 0.2 [0.0, 2.0]
+
+Notes:
+- Current-season recency-weighted form baseline; driver/team components are confounded descriptive adjustments, not identified causal skill.
+- Season-level parameter draws and team/weekend shocks represent heuristic model uncertainty; Monte Carlo standard errors measure simulation noise only.
+- Future sessions assume full distance and unchanged latest known entrants. Cancellation, shortened races, future substitutions, weather forecasts, strategies and unannounced penalties are not modeled.
+- Qualifying results require start+90min before cutoff; races start+180min and sprints start+60min. Published grid overrides qualifying once.
+- Retirement timing uses normalized 60/20-lap distances; late retirees can classify at floor(90% of winner distance). Finishing-order ranks include unclassified starters at the back.
+- 2026 countback: GP places, then GP qualifying places; residual exact ties receive random simulation allocation, not an FIA determination.
+- WARNING: 2 historical qualifying sources list fewer entrants than GP sources. Nonparticipation is possible; absent qualifying ranks are not imputed and countback coverage may be incomplete.
+- 2026 regulation reset: no constructor or driver pace estimates transferred from earlier seasons.
