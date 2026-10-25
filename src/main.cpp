@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <numeric>
 #include <set>
@@ -134,6 +135,89 @@ void write(const Forecast& f,const fs::path& out) {
     t.close();std::ifstream summary(out/"summary.txt");std::cout<<summary.rdbuf();
 }
 double rps(const std::vector<double>& p,int rank) {double c=0,s=0;for(size_t k=0;k+1<p.size();++k){c+=p[k];double y=int(k+1)>=rank?1:0;s+=(c-y)*(c-y);}return p.size()>1?s/(p.size()-1):0;}
+double mean_rank(const DriverForecast& d) {
+    double value=0;for(size_t i=0;i<d.rank_probabilities.size();++i)value+=(i+1)*d.rank_probabilities[i];return value;
+}
+std::vector<std::pair<std::string,Config>> ablations() {
+    Config base,c;std::vector<std::pair<std::string,Config>> v{{"form",base}};
+    c=base;c.baseline="standings";v.push_back({"standings",c});
+    c=base;c.track_scale=0;v.push_back({"no_track",c});
+    c=base;c.qualifying_weight=0;c.grid_effect=0;v.push_back({"no_qualifying",c});
+    c=base;c.half_life=std::numeric_limits<double>::infinity();v.push_back({"no_recency",c});
+    c=base;c.independent_team_pace=true;v.push_back({"independent_team_pace",c});
+    return v;
+}
+void overnight(const Data& all,int season,int sims,unsigned seed,const fs::path& dir) {
+    fs::create_directories(dir);std::ofstream scores(dir/"scores.csv"),rows(dir/"drivers.csv");
+    scores<<"season,through_round,cutoff,next_gp,variant,seed,simulations,boundary_n,contested_n,boundary_brier,contested_brier,boundary_rank_rps,boundary_rank_mae,boundary_points_mae,boundary_pinball,next_race_top5_brier,next_race_rank_rps,unseen_future_drivers,unpredicted_fastest_lap_points\n";
+    rows<<"season,through_round,variant,seed,driver,current_points,contested,p_top5,mcse_top5,actual_top5,expected_rank,actual_rank,expected_points,actual_points,q05,q50,q95\n";
+    std::map<std::string,Standing> actual;
+    int final_round=0,standing_round=0;
+    for(const auto& e:all.events)if(e.season==season)final_round=std::max(final_round,e.round);
+    for(const auto& s:all.standings)if(s.season==season){actual[s.driver_id]=s;standing_round=std::max(standing_round,s.round);}
+    if(!final_round||standing_round!=final_round)throw std::runtime_error("Overnight comparison requires a completed season with final standings");
+    for(int fold:{6,8,10,12,14,16,18,20}) {
+        const Event* next=nullptr;for(const auto& e:all.events)if(e.season==season&&e.round==fold+1)next=&e;
+        if(!next)continue;
+        auto first=utc(next->race_start);
+        if(!next->qualifying_start.empty())first=std::min(first,utc(next->qualifying_start));
+        if(!next->sprint_start.empty())first=std::min(first,utc(next->sprint_start));
+        const auto cutoff=stamp(first-2*86400);Data past=all;
+        auto trim=[&](auto& r){r.erase(std::remove_if(r.begin(),r.end(),[&](auto& x){return x.season==season&&x.round>fold;}),r.end());};
+        trim(past.results);trim(past.sprints);trim(past.qualifying);past.standings.clear();past.grids.clear();
+        std::set<std::string> boundary,contested;
+        double omitted_bonus=0;
+        if(season<=2024)for(const auto& r:all.results)if(r.season==season&&r.round>fold&&r.points>0)
+            omitted_bonus+=std::max(0.,r.points-points_for_position(r.position));
+        for(unsigned repeat=0;repeat<2;++repeat) {
+            const unsigned paired_seed=seed+season*100+fold+repeat*1000003;
+            Config standing_config;standing_config.baseline="standings";
+            const auto reference=forecast(past,season,fold,cutoff,sims,paired_seed,standing_config);
+            if(repeat==0) {
+                auto ordered=reference.championship;
+                // Selection uses current points only; forecast mean rank breaks points ties.
+                std::sort(ordered.begin(),ordered.end(),[](const auto& a,const auto& b){return a.current_points==b.current_points?mean_rank(a)<mean_rank(b):a.current_points>b.current_points;});
+                for(size_t i=3;i<std::min<size_t>(8,ordered.size());++i) {
+                    boundary.insert(ordered[i].id);
+                    if(top5(ordered[i])>=.05&&top5(ordered[i])<=.95)contested.insert(ordered[i].id);
+                }
+            }
+            for(const auto& variant:ablations()) {
+                const auto f=variant.first=="standings"?reference:forecast(past,season,fold,cutoff,sims,paired_seed,variant.second);check(f);
+                double brier=0,cbrier=0,rank_score=0,rank_error=0,point_error=0,pinball=0,race_top=0,race_rank=0;
+                int n=0,nc=0,nr=0,unseen=0;std::set<std::string> known;
+                for(const auto& d:f.championship) {
+                    known.insert(d.id);if(!boundary.count(d.id)||!actual.count(d.id))continue;
+                    const auto& truth=actual.at(d.id);double p=top5(d),y=truth.position<=5?1.:0.;
+                    brier+=(p-y)*(p-y);rank_score+=rps(d.rank_probabilities,truth.position);
+                    rank_error+=std::abs(mean_rank(d)-truth.position);point_error+=std::abs(d.mean_points-truth.points);++n;
+                    if(contested.count(d.id)){cbrier+=(p-y)*(p-y);++nc;}
+                    for(const auto& q:std::vector<std::pair<double,double>>{{.05,d.q05},{.5,d.q50},{.95,d.q95}}) {
+                        const double error=truth.points-q.second;pinball+=(q.first-(error<0?1.:0.))*error/3.;
+                    }
+                    rows<<std::fixed<<std::setprecision(8)<<season<<','<<fold<<','<<variant.first<<','<<paired_seed<<','<<d.id<<','<<d.current_points<<','<<contested.count(d.id)<<','<<p<<','<<std::sqrt(p*(1-p)/sims)<<','<<y<<','<<mean_rank(d)<<','<<truth.position<<','<<d.mean_points<<','<<truth.points<<','<<d.q05<<','<<d.q50<<','<<d.q95<<'\n';
+                }
+                for(const auto& a:actual)if(!known.count(a.first))++unseen;
+                std::map<std::string,int> race_truth;for(const auto& r:all.results)if(r.season==season&&r.round==fold+1)race_truth[r.driver_id]=r.position;
+                for(const auto& race:f.races)if(race.round==fold+1&&race.session=="race")for(const auto& d:race.drivers)if(race_truth.count(d.id)) {
+                    double y=race_truth[d.id]<=5?1.:0.;race_top+=(top5(d)-y)*(top5(d)-y);race_rank+=rps(d.rank_probabilities,race_truth[d.id]);++nr;
+                }
+                scores<<std::fixed<<std::setprecision(8)<<season<<','<<fold<<','<<cutoff<<','<<next->race_start<<','<<variant.first<<','<<paired_seed<<','<<sims<<','<<n<<','<<nc<<','<<brier/n<<',';
+                if(nc)scores<<cbrier/nc;else scores<<"NA";
+                scores<<','<<rank_score/n<<','<<rank_error/n<<','<<point_error/n<<','<<pinball/n<<','<<race_top/nr<<','<<race_rank/nr<<','<<unseen<<','<<omitted_bonus<<'\n';
+                std::cout<<season<<" r"<<fold<<' '<<variant.first<<" seed "<<paired_seed<<" boundary Brier "<<brier/n<<" contested ";if(nc)std::cout<<cbrier/nc;else std::cout<<"NA";std::cout<<std::endl;
+            }
+        }
+    }
+}
+void current_ablations(const Data& d,int season,int through,const std::string& cutoff,int sims,unsigned seed,const fs::path& path) {
+    fs::create_directories(path.parent_path());std::ofstream out(path);
+    out<<"variant,seed,simulations,driver,p_top5,mcse_top5,p_title,expected_rank,expected_points\n";
+    for(unsigned repeat=0;repeat<2;++repeat)for(const auto& v:ablations()) {
+        const auto paired_seed=seed+repeat*1000003;auto f=forecast(d,season,through,cutoff,sims,paired_seed,v.second);check(f);
+        for(const auto& row:f.championship){double p=top5(row);out<<std::fixed<<std::setprecision(8)<<v.first<<','<<paired_seed<<','<<sims<<','<<row.id<<','<<p<<','<<std::sqrt(p*(1-p)/sims)<<','<<title(row)<<','<<mean_rank(row)<<','<<row.mean_points<<'\n';}
+    }
+}
 // Three small, pre-weekend folds: fit past rounds only. No hyperparameter search.
 void backtest(const Data& all,int sims,unsigned seed,const fs::path& path) {
     fs::create_directories(path.parent_path());std::ofstream out(path);
@@ -183,15 +267,17 @@ int main(int argc,char** argv) {
     try {
         std::string command=argc>1?argv[1]:"help",cutoff="2026-10-25T01:50:00Z";fs::path data="data",out="reports/current";int season=2026,sims=20000;unsigned seed=20261025;
         for(int i=2;i<argc;++i){std::string a=argv[i];if(i+1>=argc)throw std::runtime_error("Missing value for "+a);std::string v=argv[++i];if(a=="--data")data=v;else if(a=="--out")out=v;else if(a=="--season")season=std::stoi(v);else if(a=="--cutoff")cutoff=v;else if(a=="--sims")sims=std::stoi(v);else if(a=="--seed")seed=unsigned(std::stoul(v));else throw std::runtime_error("Unknown argument "+a);}
-        if(command=="help"||command=="--help") {std::cout<<"make\n./f1predict forecast [--data data] [--season 2026] [--cutoff 2026-10-25T01:50:00Z] [--sims 20000] [--seed 20261025] [--out reports/current]\n./f1predict backtest --sims 2000 --out reports/backtest.csv\n./f1predict sensitivity --sims 5000 --out reports/sensitivity.csv\nInput refresh (network): ./scripts/fetch.sh\n";return 0;}
+        if(command=="help"||command=="--help") {std::cout<<"make\n./f1predict forecast [--data data] [--season 2026] [--cutoff 2026-10-25T01:50:00Z] [--sims 20000] [--seed 20261025] [--out reports/current]\n./f1predict backtest --sims 2000 --out reports/backtest.csv\n./f1predict sensitivity --sims 5000 --out reports/sensitivity.csv\n./f1predict overnight --season 2025 --sims 5000 --out reports/overnight/2025\n./f1predict ablate --sims 20000 --out reports/overnight/current.csv\nInput refresh (network): ./scripts/fetch.sh\n";return 0;}
         if(sims<1||sims>1000000)throw std::runtime_error("--sims must be 1..1000000");
         auto d=load(data);
         if(command=="backtest"){if(out=="reports/current")out="reports/backtest.csv";backtest(d,sims,seed,out);}
-        else if(command=="forecast"||command=="sensitivity") {
+        else if(command=="overnight") {if(out=="reports/current")out="reports/overnight/"+std::to_string(season);overnight(d,season,sims,seed,out);}
+        else if(command=="forecast"||command=="sensitivity"||command=="ablate") {
             std::ifstream input_cutoff(data/"CUTOFF.txt");std::string recorded;std::getline(input_cutoff,recorded);
             if(recorded!=cutoff)throw std::runtime_error("Cutoff differs from data/CUTOFF.txt; regenerate inputs for the requested cutoff first");
             int through=audit(d,season,cutoff);
             if(command=="forecast")write(forecast(d,season,through,cutoff,sims,seed),out);
+            else if(command=="ablate"){if(out=="reports/current")out="reports/overnight/current.csv";current_ablations(d,season,through,cutoff,sims,seed,out);}
             else{if(out=="reports/current")out="reports/sensitivity.csv";sensitivity(d,season,through,cutoff,sims,seed,out);}
         }
         else throw std::runtime_error("Unknown command: "+command);

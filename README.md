@@ -69,6 +69,14 @@ Compiled warning-free with Apple clang 21 on arm64. Temporary, indispensable che
 
 ## Limits and later ideas
 
+The [overnight report](reports/overnight/report.html) expands the check to eight cutoffs in each of 2024 and 2025, with fixed one-at-a-time ablations and two seeds. Defaults remain unchanged: qualifying helps, recency and correlation reverse across years, and no-track gains are too small and mixed to promote. The report explicitly shows the Piastri 2024 round-6 overconfidence miss and the limitations of the contested filter. A [100,000-simulation refresh](reports/overnight/forecast/report.html) uses the same cutoff and model; the original 20,000-simulation report is preserved.
+
+```sh
+./f1predict overnight --season 2024 --sims 5000 --out reports/overnight/2024
+./f1predict overnight --season 2025 --sims 5000 --out reports/overnight/2025
+./f1predict ablate --sims 20000 --out reports/overnight/current.csv
+```
+
 Future events assume full distance and a fixed active roster. No forecast weather, strategy, team orders, safety-car timing, cancellations, shortened events, dead heats or unannounced penalties. Unresolved regulatory ties receive reported random simulation allocation. Broad circuit groups cannot capture every track characteristic, and the 2026 sample remains small.
 
 Monte Carlo remains the sampling engine. Later, if this stays fun: a [partially pooled driver/constructor ranking model](https://doi.org/10.1515/jqas-2022-0021), dynamic form and retirement causes, then a boosted-model benchmark with enough chronological data. A [lap-level tire/pit/safety-car model](https://www.mdpi.com/2076-3417/10/12/4229) is the most work and comes last. None is implemented here.

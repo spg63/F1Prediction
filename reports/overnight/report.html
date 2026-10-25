@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>F1Prediction — overnight empirical pass</title>
+<style>
+body{font:16px/1.55 system-ui,sans-serif;max-width:1100px;margin:32px auto;padding:0 20px;background:#101820;color:#e9eff4}h1,h2{line-height:1.2}h1{color:#ff6969}h2{margin-top:36px}p,li{color:#cbd7e0}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}th,td{padding:8px 10px;border-bottom:1px solid #344351;text-align:right}th:first-child,td:first-child{text-align:left}th{color:#aabdcf}.scroll{overflow-x:auto}.callout{padding:16px 20px;border-left:4px solid #ffb45c;background:#1d2934}.good{color:#a3e2be}code,pre{font-family:ui-monospace,monospace}pre{padding:16px;background:#1c2731;overflow:auto;font-size:13px}small{color:#a8bac9}a{color:#92caff}
+</style>
+<h1>Keep the default. The evidence is mixed.</h1>
+<p>F1Prediction overnight pass · baseline commit <code>205c624</code> preserved · C++ experiment controls and CSV results only. No model improvement was promoted. The original 20,000-simulation forecast remains unchanged; its championship and race CSVs were reproduced byte for byte after adding the controls.</p>
+<p><b>Data cutoff remains 2026-10-25T01:50:00Z</b> — October 24, 21:50 New York. No new data were fetched. Austin practice and qualifying are complete, the race is pending at this cutoff, and six GPs with no Sprints remain. The new forecast below increases simulations to 100,000 using the same model, inputs and seed.</p>
+
+<h2>What helped, what hurt</h2>
+<ul>
+<li><b>Qualifying helped:</b> removing its pace observations and grid influence worsened boundary Brier in both years.</li>
+<li><b>Recency is conditional:</b> removing it improved 2025 but materially worsened 2024. A single favorable year is not enough reason to replace the six-round half-life.</li>
+<li><b>Shared team pace evidence is mixed:</b> independent shocks helped 2024 and hurt 2025. This experiment preserves marginal pace variance, rather than gaining confidence by removing noise.</li>
+<li><b>Track fit remains unproven:</b> removing it gave tiny Brier improvements in both seeds and seasons, but other scores are mixed. This is a plausible simplification to revisit, not a demonstrated upgrade.</li>
+<li><b>Standings remains a serious comparator:</b> it beats form on 2025 rank RPS and on next-race top-five Brier in both seasons. The form model is not uniformly better.</li>
+</ul>
+
+<h2>Full boundary scores stay visible</h2>
+<p>Eight cutoffs per season, through rounds <b>6, 8, 10, 12, 14, 16, 18 and 20</b>. Each uses 5,000 simulations for each of two initial seeds and six fixed variants. The boundary cohort is current points positions 4–8, selected without final outcomes; forecast mean rank breaks current-points ties. Scores average drivers within each fold, then give folds equal weight. Lower is better.</p>
+<div class="scroll"><table>
+<tr><th>Variant</th><th>2024 boundary Brier</th><th>2024 contested Brier</th><th>2025 boundary Brier</th><th>2025 contested Brier</th></tr>
+<tr><td>Form</td><td>0.11359879</td><td>0.17116836</td><td>0.01463023</td><td>0.05063575</td></tr>
+<tr><td>Standings</td><td>0.11966008</td><td>0.18215821</td><td>0.01522323</td><td>0.05593322</td></tr>
+<tr><td>No track</td><td>0.11327814</td><td>0.17063726</td><td>0.01448755</td><td>0.05009526</td></tr>
+<tr><td>No qualifying</td><td>0.12757540</td><td>0.19484894</td><td>0.02198165</td><td>0.06790403</td></tr>
+<tr><td>No recency</td><td>0.12866702</td><td>0.19436460</td><td>0.01081911</td><td>0.03570306</td></tr>
+<tr><td>Independent team pace</td><td>0.11228693</td><td>0.16934642</td><td>0.01589705</td><td>0.05559686</td></tr>
+</table></div>
+<p>“Contested” means the first-seed standings baseline assigns 5–95% top-five probability within the boundary cohort. That selection is frozen across variants and the second seed. Six 2024 cutoffs and four 2025 cutoffs contain such drivers. Empty subsets are <code>NA</code>, not zero losses. The filter is descriptive and can hide overconfidence, so it is always accompanied by the full boundary score.</p>
+<div class="callout"><b>The important miss: Piastri after 2024 round 6.</b> Form assigned <b>0.64% and 0.60%</b> top-five probability across the two seeds — about <b>0.62%</b>. He eventually finished <b>fourth</b>. The standings comparator assigned only 3.0% in the first seed, so the contested filter excluded him for being below 5%. This was bad confidence, not a settled outcome. His error remains in the full boundary scores above. It is stronger evidence against treating these probabilities as calibrated than a tiny aggregate gain is evidence for an upgrade.</div>
+
+<h2>Rank and points checks</h2>
+<div class="scroll"><table>
+<tr><th>Season / model</th><th>Boundary rank RPS</th><th>Expected-rank MAE</th><th>Expected-points MAE</th><th>Points pinball</th><th>Next-race top-five Brier</th></tr>
+<tr><td>2024 form</td><td>0.03831468</td><td>1.0688</td><td>47.8457</td><td>13.8702</td><td>0.11141869</td></tr>
+<tr><td>2024 standings</td><td>0.03994488</td><td>1.1705</td><td>44.9328</td><td>12.3475</td><td>0.10809716</td></tr>
+<tr><td>2025 form</td><td>0.00908068</td><td>0.2966</td><td>26.1437</td><td>6.1385</td><td>0.11643349</td></tr>
+<tr><td>2025 standings</td><td>0.00536483</td><td>0.1988</td><td>29.5773</td><td>7.2477</td><td>0.10993063</td></tr>
+</table></div>
+<p>Points pinball is the mean quantile loss at 5%, 50% and 95%; it is not a full-distribution CRPS. Race scores cover known drivers with observed next-race results; an unseen replacement can make that subset incomplete. All variant scores and driver-level predictions are in the accompanying CSVs.</p>
+
+<h2>Monte Carlo noise versus model evidence</h2>
+<p>Historical seeds are <code>20261025 + 100 × season + through_round</code> and that value plus <code>1000003</code>. Current controls use <code>20261025</code> and <code>21261028</code>. Each variant receives the same two initial seeds. Branches, especially retirement outcomes, can consume different random draws, so these are <b>not guaranteed identical paired paths</b>. The two replicates screen for sampling noise; they are not independent historical seasons or a statistical confidence interval.</p>
+<div class="scroll"><table>
+<tr><th>No-track minus form</th><th>Seed 1</th><th>Seed 2</th></tr>
+<tr><td>2024 full boundary Brier</td><td>−0.00052726</td><td>−0.00011405</td></tr>
+<tr><td>2024 contested Brier</td><td>−0.00075172</td><td>−0.00031047</td></tr>
+<tr><td>2025 full boundary Brier</td><td>−0.00022446</td><td>−0.00006090</td></tr>
+<tr><td>2025 contested Brier</td><td>−0.00078451</td><td>−0.00029647</td></tr>
+</table></div>
+<p>The signs agree, but the magnitude is tiny, changes across seeds, and does not uniformly improve the other metrics. More importantly, overlapping folds share races and final outcomes. Sixteen cutoffs across two seasons are not sixteen independent replications. There was no hyperparameter search or additional model fitted after seeing these results.</p>
+
+<h2>Leclerc–Norris sensitivity is not evidence of accuracy</h2>
+<p>These controls average two runs of 20,000 simulations each at the unchanged cutoff. The pooled Monte Carlo standard errors are about 0.22–0.25 percentage points for these probabilities. That only measures numerical sampling error, not the much larger uncertainty about the model.</p>
+<div class="scroll"><table>
+<tr><th>Variant</th><th>Leclerc top five</th><th>Norris top five</th></tr>
+<tr><td>Form</td><td>73.5925%</td><td>44.8675%</td></tr>
+<tr><td>Standings</td><td>77.8725%</td><td>43.7600%</td></tr>
+<tr><td>No track</td><td>74.1175%</td><td>43.8350%</td></tr>
+<tr><td>No qualifying</td><td>74.1950%</td><td>43.4875%</td></tr>
+<tr><td>No recency</td><td>67.6850%</td><td>50.6100%</td></tr>
+<tr><td>Independent team pace</td><td>73.6525%</td><td>44.9075%</td></tr>
+</table></div>
+<p>No qualifying sets both qualifying observation weight and the grid coefficient to zero. No recency gives all historical rounds equal weight for pace and failure estimates. Independent team pace replaces shared season/weekend Gaussian pace shocks with independent driver shocks of the same marginal variance; circuit and mechanical team effects remain shared. No track sets its multiplier to zero. Defaults remain unchanged.</p>
+
+<h2>Refreshed forecast: more samples, same model and data</h2>
+<p><b>100,000 simulations · seed 20261025 · cutoff 2026-10-25T01:50:00Z.</b> The original report used 20,000 simulations. Differences below are Monte Carlo sampling changes only. The largest possible marginal sampling standard error falls from 0.354 to 0.158 percentage points.</p>
+<div class="scroll"><table>
+<tr><th>Driver</th><th>Top five</th><th>Expected final rank</th><th>Expected points</th><th>Title</th></tr>
+<tr><td>Antonelli</td><td>100.000%</td><td>1.00004</td><td>437.784</td><td>99.996%</td></tr>
+<tr><td>Russell</td><td>96.159%</td><td>3.18028</td><td>304.497</td><td>0.001%</td></tr>
+<tr><td>Verstappen</td><td>94.675%</td><td>3.19260</td><td>304.517</td><td>0.002%</td></tr>
+<tr><td>Hamilton</td><td>90.490%</td><td>3.83748</td><td>292.749</td><td>0.001%</td></tr>
+<tr><td>Leclerc</td><td>73.664%</td><td>4.58641</td><td>279.781</td><td>0 sampled wins</td></tr>
+<tr><td>Norris</td><td>45.012%</td><td>5.20334</td><td>266.660</td><td>0 sampled wins</td></tr>
+</table></div>
+<p>Antonelli has 340 points to Russell’s 238: a <b>102-point lead</b>, with six full-distance GPs and <b>150 points</b> theoretically available to a driver. The title is not mathematically clinched; the model nevertheless makes losing extremely unlikely. Nothing was tuned to reduce that confidence. A zero or one from finite simulations is not a guarantee.</p>
+
+<h2>Coverage and limits</h2>
+<p>Existing real Jolpica responses supply 24 GPs and 479 classification rows in each of 2024 and 2025, with 479 qualifying rows in each year. Final standings are used only as evaluation targets; future results, qualifying, grids and standings are removed before fitting. The realized calendar is used retrospectively. The model fixes the latest known roster, so it misses one to three later entrants in some 2024 folds and one in 2025 round 6. Boundary drivers themselves have observed final outcomes.</p>
+<p><b>2024 is secondary evidence.</b> The existing simulator omits future fastest-lap bonus points, which still existed that year. There are 19 observed bonus points in the full 2024 data, with 3–14 across the remaining grid in these folds. Starting points include actual past bonuses, and final targets retain actual bonuses; 2024 point calibration therefore has a known mismatch. No historical rule extension was added for this small pass.</p>
+<p>The current snapshot still has 17 completed 2026 GPs and six Sprints, with totals reconciled to standings. Austin qualifying and its provisional penalty-adjusted grid are verified official supplements. The Australian and Spanish 2026 qualifying sources omit some entrants; missing ranks are not imputed, so exact qualifying countback coverage can be incomplete. Later source corrections cannot be reconstructed from retrospective downloads.</p>
+<p>Full-distance events, fixed rosters and heuristic pace/reliability scales remain assumptions. Weather forecasts, strategy, future penalties, cancellations and shortened races are absent. The Piastri miss and cross-season reversals show why neither calibration nor future accuracy has been established.</p>
+
+<h2>Reproduce and inspect</h2>
+<pre>cd ~/git/F1Prediction
+make
+./f1predict overnight --season 2024 --sims 5000 --seed 20261025 --out reports/overnight/2024
+./f1predict overnight --season 2025 --sims 5000 --seed 20261025 --out reports/overnight/2025
+./f1predict ablate --sims 20000 --seed 20261025 --out reports/overnight/current.csv
+./f1predict forecast --sims 100000 --seed 20261025 --out reports/overnight/forecast</pre>
+<p>Files: <code>2024/scores.csv</code>, <code>2024/drivers.csv</code>, <code>2025/scores.csv</code>, <code>2025/drivers.csv</code>, <code>current.csv</code>, <code>summary.csv</code>, and the complete refreshed forecast in <code>forecast/</code>. Scores contain every fold cutoff and seed. The original 2,000-simulation checkpoint is retained in <code>checkpoint-2025/</code>. No frameworks, test suite, new dependencies or data pipeline were added. Compilation was warning-free; actual runs checked rank rows/columns and top-five probability mass.</p>
+<p><small>Source credit: Jolpica F1 / Ergast-compatible public API, with official Formula 1 cross-checks. Existing source URLs, retrieval times and attribution remain in <code>data/SOURCES.txt</code>, <code>docs/DATA.md</code> and <code>docs/SOURCE_REVIEW.md</code>. This HTML is self-contained and needs no external assets.</small></p>
+</html>

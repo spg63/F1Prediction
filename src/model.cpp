@@ -175,7 +175,7 @@ Forecast forecast(const Data& data, int season, int through_round, const std::st
         }
     }
     for (const auto& session : qualifying) if (session.first <= through_round) {
-        const double weight = .55 * std::pow(.5, std::max(0, through_round - session.first) / config.half_life);
+        const double weight = config.qualifying_weight * std::pow(.5, std::max(0, through_round - session.first) / config.half_life);
         for (const auto& row : session.second) if (row.position > 0)
             observations.push_back({row.driver_id, row.team_id, track_type(events.at(session.first).circuit_id),
                 (1. - config.grid_effect) * rank_score(row.position, static_cast<int>(session.second.size())), weight});
@@ -286,9 +286,12 @@ Forecast forecast(const Data& data, int season, int through_round, const std::st
                 const auto hazard = mechanical.count(driver.team) ? mechanical.at(driver.team) : std::make_pair(1.5,28.5);
                 mechanical_probability[driver.team] = beta_draw(hazard.first, hazard.second, rng);
             }
-            persistent_driver[d] = normal(rng) * (config.baseline == "form" ? driver.uncertainty : .08) * config.parameter_scale;
+            const double driver_sd = config.baseline == "form" ? driver.uncertainty : .08;
+            const double team_sd = config.baseline == "form" ?
+                .025 + .18 / std::sqrt(2. + team_form[driver.team].effective()) : .08;
+            persistent_driver[d] = normal(rng) * (config.independent_team_pace ? std::hypot(driver_sd, team_sd) : driver_sd) * config.parameter_scale;
             incident[d] = config.baseline == "form" ? beta_draw(driver.incident_a, driver.incident_b, rng) : .04;
-            season_mean[d] = driver.mean + persistent_driver[d] + persistent_team[driver.team];
+            season_mean[d] = driver.mean + persistent_driver[d] + (config.independent_team_pace ? 0. : persistent_team[driver.team]);
         }
         int last_round = -1;
         std::vector<double> weekend_driver(count);
@@ -297,7 +300,7 @@ Forecast forecast(const Data& data, int season, int through_round, const std::st
             const auto& session = future[session_index];
             if (last_round != session.event.round) {
                 last_round = session.event.round; weekend_team.clear();
-                for (const int d : entrants) weekend_driver[d] = .08 * normal(rng) * config.noise_scale;
+                for (const int d : entrants) weekend_driver[d] = .08 * normal(rng) * config.noise_scale * (config.independent_team_pace ? std::sqrt(2.) : 1.);
                 for (const int d : entrants) if (!weekend_team.count(field[d].team))
                     weekend_team[field[d].team] = .08 * normal(rng) * config.noise_scale;
             }
@@ -308,7 +311,7 @@ Forecast forecast(const Data& data, int season, int through_round, const std::st
                 if (!persistent_track.count(key)) persistent_track[key] = .08 * normal(rng) * config.parameter_scale;
                 const double track = config.baseline == "form" && type != "unknown" ? config.track_scale *
                     (track_residual[key].shrunk(8.) + persistent_track[key]) : 0.;
-                pace[d] = season_mean[d] + track + weekend_driver[d] + weekend_team[field[d].team];
+                pace[d] = season_mean[d] + track + weekend_driver[d] + (config.independent_team_pace ? 0. : weekend_team[field[d].team]);
                 quali_score[d] = pace[d] + .18 * normal(rng) * config.noise_scale;
             }
             const auto qualifying_order = order_scores(quali_score);

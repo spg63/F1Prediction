@@ -42,6 +42,8 @@ struct Data {
 struct Config {
     double half_life=6, noise_scale=1, reliability_scale=1, parameter_scale=1;
     double grid_effect=.25, track_scale=.15;
+    double qualifying_weight=.55;
+    bool independent_team_pace=false; // ablation: preserve marginal variance, remove shared pace shocks
     std::string baseline="form"; // form, standings, uniform
 };
 struct DriverForecast {
